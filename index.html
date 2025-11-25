@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>條碼盤點（離線版 PWA）</title>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- 外部樣式 -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h2>條碼盤點（離線版 PWA）</h2>
+
+  <!-- 狀態列 -->
+  <div class="card" style="margin-top:0">
+    <div>
+      <span>狀態：</span>
+      <span id="netStatus" class="badge">檢查中...</span>
+      <span id="queueStatus" class="badge unsynced" style="display:none"></span>
+    </div>
+  </div>
+
+  <!-- 盤點設定 -->
+  <div class="card">
+    <label>盤點日</label>
+    <input id="invDate" type="date"
+           style="width:14ch;text-align:center;letter-spacing:1px;" />
+
+    <label style="margin-top:10px">庫別代號（最多 5 碼，自動大寫）</label>
+    <input id="warehouse" type="text" placeholder="例如：D-1"
+           maxlength="5" autocomplete="off" spellcheck="false"
+           style="width:16ch;text-transform:uppercase;text-align:center;letter-spacing:2px;" />
+  </div>
+
+  <!-- 條碼與數量 -->
+  <div class="card">
+    <label>商品料號（最多 15 碼）</label>
+    <div class="barcode-wrap">
+      <input id="barcode" type="text" inputmode="text" autocomplete="off"
+             spellcheck="false"
+             placeholder="請掃描或輸入條碼" maxlength="15" />
+    </div>
+
+    <label style="margin-top:14px">商品數量（最多 10 碼）</label>
+    <div class="qty-grid">
+      <input id="qty" type="tel" inputmode="tel" enterkeyhint="send"
+             placeholder="請輸入數量" maxlength="10" autocomplete="off" />
+      <button id="btnSubmit">送出</button>
+    </div>
+    <div class="muted" style="margin-top:10px">
+      ➤ 條碼槍掃描完成若送出 <b>TAB</b>，游標會跳到數量欄位；手動輸入時按 Enter 也能跳轉。<br>
+      ➤ 即使沒網路，資料也會先存到本機，稍後再同步。
+    </div>
+  </div>
+
+  <!-- 最近五筆（本機） -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3>最近 5 筆（本機資料）</h3>
+      <div style="display:flex;gap:10px">
+        <button id="btnSync" class="ghost" style="width:auto;padding:0 16px">立即同步</button>
+      </div>
+    </div>
+    <div id="recent" style="margin-top:10px"></div>
+  </div>
+
+  <!-- 寄送 CSV -->
+  <div class="card">
+    <h3 style="margin-bottom:12px">盤點結束：寄送 .csv（需上網）</h3>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:14px">
+      <input id="email" type="email" placeholder="收件者 Email（必填）"/>
+      <button id="btnExport">寄出 .csv</button>
+    </div>
+  </div>
+
+  <!-- 主程式 -->
+  <script src="app.js" defer></script>
+</body>
+</html>
