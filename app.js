@@ -232,7 +232,8 @@ async function syncNow(){
   try {
     const res = await fetch(API_URL, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      // 改成 text/plain，避免 Safari / CORS preflight 造成 Load failed
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body: JSON.stringify({
         secret: API_SECRET,
         action: 'sync',
@@ -332,7 +333,8 @@ document.getElementById('btnExport').addEventListener('click', async () => {
   try {
     const res = await fetch(API_URL, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      // 一樣用 text/plain 避免 CORS preflight
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body: JSON.stringify({
         secret: API_SECRET,
         action: 'exportCsv',
@@ -364,4 +366,3 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
   });
 }
-
