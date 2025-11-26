@@ -1,9 +1,10 @@
-/* ===== 設定：請改成你的 API URL 與密鑰 ===== */
-const API_URL    = 'https://script.google.com/macros/s/AKfycbxylbWYd385ziInsNEZU8qffWG0fpxTjFwq_ZuXXqzfvVSwEsY7uF5kIiWwXl2z8BPZxQ/exec'; // ★貼上你的 Web App URL
-const API_SECRET = 'Tgg_45499448_Tmg'; // ★必須跟 Code.gs 的 API_SECRET 一樣
+/* ===== 基本設定：依你的環境調整 ===== */
+const API_URL    = 'https://script.google.com/macros/s/AKfycbxylbWYd385ziInsNEZU8qffWG0fpxTjFwq_ZuXXqzfvVSwEsY7uF5kIiWwXl2z8BPZxQ/exec';
+const API_SECRET = 'Tgg_45499448_Tmg';
+
 const DB_NAME    = 'inventoryPWA';
 const DB_VERSION = 1;
-const STORE_NAME = 'pending';  // 排隊中的資料（尚未同步或已同步）
+const STORE_NAME = 'pending';
 
 /* ===== IndexedDB ===== */
 let dbPromise = null;
@@ -20,48 +21,48 @@ function openDB() {
       }
     };
     req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error);
+    req.onerror = e => reject(e.target.error);
   });
   return dbPromise;
 }
 
-async function addPending(entry){
+async function addPending(entry) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME,'readwrite');
+    const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).put(entry);
     tx.oncomplete = () => resolve();
-    tx.onerror    = e => reject(e.target.error);
+    tx.onerror = e => reject(e.target.error);
   });
 }
 
-async function getAllPending(){
+async function getAllPending() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME,'readonly');
+    const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const req = store.index('byCreated').getAll();
     req.onsuccess = () => resolve(req.result || []);
-    req.onerror   = e => reject(e.target.error);
+    req.onerror = e => reject(e.target.error);
   });
 }
 
-async function removePending(id){
+async function removePending(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME,'readwrite');
+    const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).delete(id);
     tx.oncomplete = () => resolve();
-    tx.onerror    = e => reject(e.target.error);
+    tx.onerror = e => reject(e.target.error);
   });
 }
 
 /* ===== 工具 ===== */
 function uuid() {
-  return 'L' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2,8);
+  return 'L' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
-function vibrateOk(){ if(navigator.vibrate) navigator.vibrate(20); }
-function vibrateError(){ if(navigator.vibrate) navigator.vibrate([40,30,40]); }
+function vibrateOk()    { if (navigator.vibrate) navigator.vibrate(20); }
+function vibrateError() { if (navigator.vibrate) navigator.vibrate([40,30,40]); }
 
 function setNetStatus() {
   const el = document.getElementById('netStatus');
@@ -74,44 +75,102 @@ function setNetStatus() {
   }
 }
 
-async function updateQueueStatus(){
+async function updateQueueStatus() {
   const data = await getAllPending();
   const unsynced = data.filter(d => !d.syncedAt);
   const el = document.getElementById('queueStatus');
-  if (unsynced.length === 0) {
-    el.style.display = 'none';
+  if (!unsynced.length) {
+    el.textContent = '無待同步';
+    el.classList.add('muted');
   } else {
-    el.style.display = 'inline-block';
     el.textContent = `尚有 ${unsynced.length} 筆待同步`;
+    el.classList.remove('muted');
   }
 }
 
-/* ===== UI DOM ===== */
-const invDateEl = document.getElementById('invDate');
-const whEl      = document.getElementById('warehouse');
-const barcodeEl = document.getElementById('barcode');
-const qtyEl     = document.getElementById('qty');
-const recentEl  = document.getElementById('recent');
+/* ===== DOM ===== */
+const invDateEl      = document.getElementById('invDate');
+const whEl           = document.getElementById('warehouse');
+const lockHeaderEl   = document.getElementById('lockHeader');
+const settingsPanel  = document.getElementById('settingsPanel');
+const btnToggleSettings = document.getElementById('btnToggleSettings');
 
-/* ===== 初始化 日期與庫別（從 localStorage） ===== */
+const barcodeEl      = document.getElementById('barcode');
+const qtyEl          = document.getElementById('qty');
+const btnSubmit      = document.getElementById('btnSubmit');
+const recentEl       = document.getElementById('recent');
+
+const btnSync        = document.getElementById('btnSync');
+const btnClearSheet  = document.getElementById('btnClearSheet');
+const emailEl        = document.getElementById('email');
+const btnExport      = document.getElementById('btnExport');
+
+const searchBarcodeEl = document.getElementById('searchBarcode');
+const btnSearchReset  = document.getElementById('btnSearchReset');
+
+/* ===== 初始化 Header（盤點日 / 庫別 / 鎖定 / 收合） ===== */
 (function initHeader(){
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm   = String(today.getMonth()+1).padStart(2,'0');
   const dd   = String(today.getDate()).padStart(2,'0');
-  invDateEl.value = localStorage.getItem('invDate') || `${yyyy}-${mm}-${dd}`;
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  invDateEl.value = localStorage.getItem('invDate') || todayStr;
   whEl.value      = localStorage.getItem('warehouse') || '';
 
   invDateEl.addEventListener('change', () => {
+    if (lockHeaderEl.checked) return; // 鎖定時不改
     localStorage.setItem('invDate', invDateEl.value);
+    renderRecent();
   });
+
   whEl.addEventListener('input', () => {
+    if (lockHeaderEl.checked) {
+      // 若鎖定就恢復原值
+      whEl.value = localStorage.getItem('warehouse') || whEl.value;
+      return;
+    }
     whEl.value = whEl.value.toUpperCase().replace(/[^A-Z0-9\-]/g,'').slice(0,5);
     localStorage.setItem('warehouse', whEl.value);
+    renderRecent();
+  });
+
+  // 鎖定設定
+  const savedLock = localStorage.getItem('lockHeader');
+  const locked = savedLock === null ? true : savedLock === '1';
+  lockHeaderEl.checked = locked;
+  applyHeaderLock();
+
+  lockHeaderEl.addEventListener('change', () => {
+    localStorage.setItem('lockHeader', lockHeaderEl.checked ? '1' : '0');
+    applyHeaderLock();
+  });
+
+  // 收合狀態
+  const collapsed = localStorage.getItem('settingsCollapsed') === '1';
+  if (collapsed) {
+    settingsPanel.classList.add('collapsed');
+    btnToggleSettings.textContent = '▼ 展開設定';
+  } else {
+    btnToggleSettings.textContent = '▲ 收合設定';
+  }
+
+  btnToggleSettings.addEventListener('click', () => {
+    settingsPanel.classList.toggle('collapsed');
+    const isCollapsed = settingsPanel.classList.contains('collapsed');
+    btnToggleSettings.textContent = isCollapsed ? '▼ 展開設定' : '▲ 收合設定';
+    localStorage.setItem('settingsCollapsed', isCollapsed ? '1' : '0');
   });
 })();
 
-/* ===== 條碼欄位：TAB 由瀏覽器自行跳欄，Enter 另外支援 ===== */
+function applyHeaderLock() {
+  const locked = lockHeaderEl.checked;
+  invDateEl.disabled = locked;
+  whEl.disabled      = locked;
+}
+
+/* ===== 輸入欄位互動 ===== */
 barcodeEl.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     e.preventDefault();
@@ -120,23 +179,26 @@ barcodeEl.addEventListener('keydown', e => {
   }
 });
 
-/* ===== 數量欄位只接受數字 + Enter 送出 ===== */
 qtyEl.addEventListener('keydown', e => {
   if (['.',' ',',','e','E','+','-'].includes(e.key)) e.preventDefault();
-  if (e.key === 'Enter') { e.preventDefault(); doSubmitLocal(); }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    doSubmitLocal();
+  }
 });
+
 qtyEl.addEventListener('input', () => {
   qtyEl.value = qtyEl.value.replace(/[^\d]/g,'').slice(0,10);
 });
 
-document.getElementById('btnSubmit').addEventListener('click', doSubmitLocal);
+btnSubmit.addEventListener('click', doSubmitLocal);
 
-/* ===== 在本機新增一筆紀錄（不直接上傳） ===== */
-async function doSubmitLocal(){
+/* ===== 新增本機紀錄 ===== */
+async function doSubmitLocal() {
   const date    = invDateEl.value;
   const wh      = whEl.value.trim();
   const barcode = barcodeEl.value.trim();
-  const qty     = parseInt(qtyEl.value.trim(),10);
+  const qty     = parseInt(qtyEl.value.trim(), 10);
 
   if (!date || !wh || !barcode || !Number.isInteger(qty) || qty <= 0) {
     vibrateError();
@@ -146,13 +208,15 @@ async function doSubmitLocal(){
 
   const entry = {
     id: uuid(),
-    date, wh, barcode, qty,
+    date, wh, barcode,
+    qty,
     createdAt: new Date().toISOString(),
     syncedAt: null
   };
 
   await addPending(entry);
   vibrateOk();
+
   barcodeEl.value = '';
   qtyEl.value = '';
   barcodeEl.focus();
@@ -161,20 +225,31 @@ async function doSubmitLocal(){
   await updateQueueStatus();
 }
 
-/* ===== 最近五筆畫面（只看本機 DB） ===== */
-async function renderRecent(){
-  const data = await getAllPending();
-  // 依建立時間排序（新→舊），取前 5 筆
-  data.sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
-  const rows = data.slice(0,5);
+/* ===== 顯示最近 50 筆（依當前盤點日 + 庫別 + 搜尋條件） ===== */
+async function renderRecent() {
+  const curDate = invDateEl.value;
+  const curWh   = whEl.value.trim();
+  const filterBarcode = searchBarcodeEl.value.trim();
+
+  const all = await getAllPending();
+  let list = all.filter(x => x.date === curDate && x.wh === curWh);
+
+  if (filterBarcode) {
+    const key = filterBarcode.toUpperCase();
+    list = list.filter(x => String(x.barcode).toUpperCase().includes(key));
+  }
+
+  list.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+  list = list.slice(0,50);
 
   recentEl.innerHTML = '';
-  if (!rows.length) {
-    recentEl.innerHTML = '<div class="muted">目前沒有本機紀錄。</div>';
+
+  if (!list.length) {
+    recentEl.innerHTML = '<div class="hint small">目前沒有符合條件的本機紀錄。</div>';
     return;
   }
 
-  rows.forEach(r => {
+  list.forEach(r => {
     const row = document.createElement('div');
     row.className = 'row';
     row.dataset.id = r.id;
@@ -185,38 +260,84 @@ async function renderRecent(){
 
     row.innerHTML = `
       <div class="info">
-        <div>
-          <div class="barcode">${r.barcode}</div>
-          <div class="meta">
-            ${r.date} ｜ ${r.wh}
-            <span class="badge ${stateClass}">${stateText}</span>
-          </div>
+        <div class="barcode">${r.barcode}</div>
+        <div class="meta">
+          <span>${r.date} ｜ ${r.wh}</span>
+          <span class="badge ${stateClass}">${stateText}</span>
         </div>
       </div>
       <div class="ctrls">
+        <button class="icon-btn btn-minus">-</button>
         <div class="qty-box"><span class="qty">${r.qty}</span></div>
-        <button class="del btn-del">🗑</button>
+        <button class="icon-btn btn-plus">+</button>
+        <button class="icon-btn btn-del">🗑</button>
       </div>
     `;
     recentEl.appendChild(row);
   });
 }
 
-/* 刪除本機某筆（暫存，不回寫伺服器） */
+/* ===== 最近清單：刪除 / 數量 +/- ===== */
 recentEl.addEventListener('click', async e => {
   const row = e.target.closest('.row');
   if (!row) return;
+  const id = row.dataset.id;
+
   if (e.target.closest('.btn-del')) {
     if (confirm('只會刪除本機暫存紀錄，不會影響試算表。確定刪除？')) {
-      await removePending(row.dataset.id);
+      await removePending(id);
       await renderRecent();
       await updateQueueStatus();
     }
+    return;
+  }
+
+  if (e.target.closest('.btn-plus')) {
+    await changeQty(id, +1);
+    return;
+  }
+
+  if (e.target.closest('.btn-minus')) {
+    await changeQty(id, -1);
+    return;
   }
 });
 
+async function changeQty(id, delta) {
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const obj = req.result;
+      if (!obj) { resolve(); return; }
+      let q = (obj.qty || 0) + delta;
+      if (q < 1) q = 1;
+      obj.qty = q;
+      obj.syncedAt = null; // 調整後需重新同步
+      store.put(obj);
+    };
+    req.onerror = e => reject(e.target.error);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e.target.error);
+  });
+
+  await renderRecent();
+  await updateQueueStatus();
+}
+
+/* 搜尋條碼 */
+searchBarcodeEl.addEventListener('input', () => {
+  renderRecent();
+});
+btnSearchReset.addEventListener('click', () => {
+  searchBarcodeEl.value = '';
+  renderRecent();
+});
+
 /* ===== 同步到伺服器 ===== */
-async function syncNow(){
+async function syncNow() {
   if (!navigator.onLine) {
     vibrateError();
     alert('目前為離線狀態，無法同步。');
@@ -231,9 +352,8 @@ async function syncNow(){
 
   try {
     const res = await fetch(API_URL, {
-      method:'POST',
-      // 改成 text/plain，避免 Safari / CORS preflight 造成 Load failed
-      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         secret: API_SECRET,
         action: 'sync',
@@ -250,15 +370,15 @@ async function syncNow(){
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || '同步失敗');
 
-    // 把成功的標記為 syncedAt
-    const okIds = (json.results || []).filter(r=>r.status==='ok').map(r=>r.clientId);
+    const okIds = (json.results || []).filter(r => r.status === 'ok').map(r => r.clientId);
+
     const db = await openDB();
-    await new Promise((resolve,reject)=>{
-      const tx = db.transaction(STORE_NAME,'readwrite');
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      okIds.forEach(id=>{
+      okIds.forEach(id => {
         const getReq = store.get(id);
-        getReq.onsuccess = ()=>{
+        getReq.onsuccess = () => {
           const obj = getReq.result;
           if (obj) {
             obj.syncedAt = new Date().toISOString();
@@ -266,8 +386,8 @@ async function syncNow(){
           }
         };
       });
-      tx.oncomplete = ()=>resolve();
-      tx.onerror    = e=>reject(e.target.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = e => reject(e.target.error);
     });
 
     vibrateOk();
@@ -280,51 +400,98 @@ async function syncNow(){
   }
 }
 
-document.getElementById('btnSync').addEventListener('click', syncNow);
+btnSync.addEventListener('click', syncNow);
 
-/* 網路恢復時自動嘗試同步一次 */
-window.addEventListener('online', async () => {
-  setNetStatus();
-  await updateQueueStatus();
-  syncNow(); // 如不要自動同步可註解掉
-});
-window.addEventListener('offline', () => {
-  setNetStatus();
-});
+/* ===== 清空試算表（指定日期 + 庫別） ===== */
+async function clearSheetOnServer() {
+  if (!navigator.onLine) {
+    vibrateError();
+    alert('目前為離線狀態，無法清空試算表。');
+    return;
+  }
+  const d = invDateEl.value;
+  const w = whEl.value.trim();
+  if (!d || !w) {
+    vibrateError();
+    alert('請先設定盤點日與庫別');
+    return;
+  }
+  if (!confirm(`確定要清空試算表中\n日期：${d}\n庫別：${w}\n的所有盤點紀錄？`)) {
+    return;
+  }
 
-/* ===== 寄 CSV ===== */
-function normalizeEmailList(input){
+  try {
+    const res = await fetch(API_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        secret: API_SECRET,
+        action: 'clearSheet',
+        date: d,
+        wh: w
+      })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || '清空失敗');
+
+    // 本機暫存中同日期+庫別的資料也一併刪除
+    const all = await getAllPending();
+    const db = await openDB();
+    await new Promise((resolve,reject)=>{
+      const tx = db.transaction(STORE_NAME,'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      all.forEach(x=>{
+        if (x.date === d && x.wh === w) store.delete(x.id);
+      });
+      tx.oncomplete = ()=>resolve();
+      tx.onerror = e=>reject(e.target.error);
+    });
+
+    vibrateOk();
+    alert(`已清空試算表：刪除 ${json.removed} 筆資料。`);
+    await renderRecent();
+    await updateQueueStatus();
+  } catch (err) {
+    vibrateError();
+    alert('清空失敗：' + err.message);
+  }
+}
+
+btnClearSheet.addEventListener('click', clearSheetOnServer);
+
+/* ===== 寄出 CSV ===== */
+function normalizeEmailList(input) {
   const s = String(input || '').trim().replace(/[；;、\s]+/g, ',');
   const arr = s.split(',').map(e => e.trim()).filter(Boolean);
   return arr.join(',');
 }
-function isValidEmail(email){
+function isValidEmail(email) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
 }
 
-document.getElementById('btnExport').addEventListener('click', async () => {
+btnExport.addEventListener('click', async () => {
   if (!navigator.onLine) {
     vibrateError();
     alert('目前為離線狀態，無法寄出 Email。');
     return;
   }
-  const raw = document.getElementById('email').value;
+  const raw = emailEl.value;
   const normalized = normalizeEmailList(raw);
-  if(!normalized){
+  if (!normalized) {
     vibrateError();
-    alert('請先輸入收件者 Email'); 
+    alert('請先輸入收件者 Email');
     return;
   }
   const list = normalized.split(',');
-  if(list.some(e => !isValidEmail(e))){
+  if (list.some(e => !isValidEmail(e))) {
     vibrateError();
     alert('收件者 Email 格式不正確：' + normalized);
     return;
   }
   const d = invDateEl.value;
   const w = whEl.value.trim();
-  if(!d || !w){
+  if (!d || !w) {
     vibrateError();
     alert('請先輸入盤點日與庫別');
     return;
@@ -333,7 +500,6 @@ document.getElementById('btnExport').addEventListener('click', async () => {
   try {
     const res = await fetch(API_URL, {
       method:'POST',
-      // 一樣用 text/plain 避免 CORS preflight
       headers:{ 'Content-Type':'text/plain;charset=utf-8' },
       body: JSON.stringify({
         secret: API_SECRET,
@@ -345,6 +511,7 @@ document.getElementById('btnExport').addEventListener('click', async () => {
     });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || '匯出失敗');
+
     vibrateOk();
     alert(`已寄出 .csv 到：${normalized}\n筆數：${json.rows}\n檔名：${json.fileName}`);
   } catch (err) {
@@ -353,14 +520,25 @@ document.getElementById('btnExport').addEventListener('click', async () => {
   }
 });
 
-/* ===== 啟動時載入本機資料與狀態 ===== */
-(async function init(){
+/* ===== 啟動時載入狀態 ===== */
+(async function init() {
   setNetStatus();
   await renderRecent();
   await updateQueueStatus();
 })();
 
-/* 登記 service worker（PWA 離線） */
+/* 網路狀態變更 */
+window.addEventListener('online', async () => {
+  setNetStatus();
+  await updateQueueStatus();
+  // 可視需求決定是否自動同步
+  // syncNow();
+});
+window.addEventListener('offline', () => {
+  setNetStatus();
+});
+
+/* Service Worker（PWA） */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js');
