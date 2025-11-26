@@ -2,82 +2,122 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>條碼盤點（離線版 PWA）</title>
-
-  <!-- PWA manifest -->
+  <title>條碼盤點（專業版 V2）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="manifest" href="manifest.json">
-
-  <!-- 外部樣式 -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="theme-color" content="#111111">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h2>條碼盤點（離線版 PWA）</h2>
-
-  <!-- 狀態列 -->
-  <div class="card" style="margin-top:0">
-    <div>
-      <span>狀態：</span>
-      <span id="netStatus" class="badge">檢查中...</span>
-      <span id="queueStatus" class="badge unsynced" style="display:none"></span>
-    </div>
-  </div>
-
-  <!-- 盤點設定 -->
-  <div class="card">
-    <label>盤點日</label>
-    <input id="invDate" type="date"
-           style="width:14ch;text-align:center;letter-spacing:1px;" />
-
-    <label style="margin-top:10px">庫別代號（最多 5 碼，自動大寫）</label>
-    <input id="warehouse" type="text" placeholder="例如：D-1"
-           maxlength="5" autocomplete="off" spellcheck="false"
-           style="width:16ch;text-transform:uppercase;text-align:center;letter-spacing:2px;" />
-  </div>
-
-  <!-- 條碼與數量 -->
-  <div class="card">
-    <label>商品料號（最多 15 碼）</label>
-    <div class="barcode-wrap">
-      <input id="barcode" type="text" inputmode="text" autocomplete="off"
-             spellcheck="false"
-             placeholder="請掃描或輸入條碼" maxlength="15" />
-    </div>
-
-    <label style="margin-top:14px">商品數量（最多 10 碼）</label>
-    <div class="qty-grid">
-      <input id="qty" type="tel" inputmode="tel" enterkeyhint="send"
-             placeholder="請輸入數量" maxlength="10" autocomplete="off" />
-      <button id="btnSubmit">送出</button>
-    </div>
-    <div class="muted" style="margin-top:10px">
-      ➤ 條碼槍掃描完成若送出 <b>TAB</b>，游標會跳到數量欄位；手動輸入時按 Enter 也能跳轉。<br>
-      ➤ 即使沒網路，資料也會先存到本機，稍後再同步。
-    </div>
-  </div>
-
-  <!-- 最近五筆（本機） -->
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <h3>最近 5 筆（本機資料）</h3>
-      <div style="display:flex;gap:10px">
-        <button id="btnSync" class="ghost" style="width:auto;padding:0 16px">立即同步</button>
+  <div class="app">
+    <header class="app-header">
+      <div>
+        <h1>條碼盤點（專業版 V2）</h1>
+        <p class="sub">離線可用 · iOS / Android PWA · Google 試算表同步</p>
       </div>
-    </div>
-    <div id="recent" style="margin-top:10px"></div>
+      <div class="status-box">
+        <div>網路：<span id="netStatus" class="badge">偵測中…</span></div>
+        <div>同步：<span id="queueStatus" class="badge muted">無待同步</span></div>
+      </div>
+    </header>
+
+    <!-- 盤點設定（可收合 + 鎖定） -->
+    <section class="card">
+      <button id="btnToggleSettings" class="ghost full">
+        ▲ 收合設定
+      </button>
+
+      <div id="settingsPanel">
+        <label>盤點日</label>
+        <input id="invDate" type="date"
+               style="width:14ch;text-align:center;letter-spacing:1px;" />
+
+        <label style="margin-top:10px">庫別代號（最多 5 碼，自動大寫）</label>
+        <input id="warehouse" type="text" placeholder="例如：D-1"
+               maxlength="5" autocomplete="off" spellcheck="false"
+               style="width:16ch;text-transform:uppercase;text-align:center;letter-spacing:2px;" />
+
+        <label class="lock-row">
+          <input id="lockHeader" type="checkbox">
+          鎖定盤點日與庫別（本次作業）
+        </label>
+      </div>
+    </section>
+
+    <!-- 掃描 / 輸入區 -->
+    <section class="card">
+      <h2>掃描與輸入</h2>
+      <p class="hint">
+        條碼槍掃描完成若送出 <strong>TAB</strong>，游標會自動跳到數量；
+        手動輸入時按 Enter 也能跳轉。數量按 Enter 會直接送出。
+      </p>
+
+      <div class="grid-2">
+        <div>
+          <label>商品條碼（最多 20 碼）</label>
+          <input id="barcode" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="請掃描或輸入條碼">
+        </div>
+        <div>
+          <label>數量（最大 10 碼）</label>
+          <input id="qty" type="number" min="1" inputmode="numeric"
+                 placeholder="請輸入數量">
+        </div>
+      </div>
+
+      <button id="btnSubmit" class="primary full" style="margin-top:10px">
+        送出（寫入本機）
+      </button>
+
+      <p class="hint small">
+        即使沒有網路，資料也會先存到本機，之後再同步到 Google 試算表。
+      </p>
+    </section>
+
+    <!-- 人工調整模式 + 同步 / 清空 -->
+    <section class="card">
+      <div class="card-header-row">
+        <h2>人工調整模式（當前盤點日 + 庫別）</h2>
+        <div class="btn-row">
+          <button id="btnSync" class="ghost">立即同步</button>
+          <button id="btnClearSheet" class="danger">清空試算表</button>
+        </div>
+      </div>
+
+      <div class="search-row">
+        <input id="searchBarcode" type="text" placeholder="搜尋條碼（空白=顯示全部）">
+        <button id="btnSearchReset" class="ghost">重設</button>
+      </div>
+      <p class="hint small">
+        最多顯示 50 筆，僅限目前盤點日 + 庫別。按「－ / ＋」可調整數量，垃圾桶可刪除本機暫存。
+        調整後需再次「立即同步」才會寫入試算表。
+      </p>
+
+      <div id="recent" style="margin-top:10px"></div>
+    </section>
+
+    <!-- 匯出 CSV -->
+    <section class="card">
+      <h2>盤點結果：寄出 .csv（需上網）</h2>
+      <p class="hint small">
+        只會匯出「庫別、商品條碼、數量」三欄，格式為純文字，方便匯入 Excel。
+      </p>
+
+      <label>收件者 Email（可多個，以逗號 / 空白分隔）</label>
+      <input id="email" type="email" placeholder="例如：user@example.com, boss@example.com">
+
+      <button id="btnExport" class="primary full" style="margin-top:10px">
+        寄出 .csv
+      </button>
+    </section>
+
+    <footer class="footer">
+      <span>專業盤點模式 V2 · 支援離線與多裝置 · 由 Apps Script + GitHub Pages 驅動</span>
+    </footer>
   </div>
 
-  <!-- 寄送 CSV -->
-  <div class="card">
-    <h3 style="margin-bottom:12px">盤點結束：寄送 .csv（需上網）</h3>
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:14px">
-      <input id="email" type="email" placeholder="收件者 Email（必填）"/>
-      <button id="btnExport">寄出 .csv</button>
-    </div>
-  </div>
-
-  <!-- 主程式 -->
-  <script src="app.js" defer></script>
+  <script src="app.js"></script>
 </body>
 </html>
