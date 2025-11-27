@@ -125,22 +125,29 @@ const btnSearchReset  = document.getElementById('btnSearchReset');
     renderRecent();
   });
 
+  // ★ 庫別輸入：可正常打字、清空；鎖定時直接忽略
   whEl.addEventListener('input', () => {
-    if (lockHeaderEl.checked) {
-      // 若鎖定就恢復原值
-      whEl.value = localStorage.getItem('warehouse') || whEl.value;
-      return;
-    }
-    whEl.value = whEl.value.toUpperCase().replace(/[^A-Z0-9\-]/g,'').slice(0,5);
+    if (lockHeaderEl.checked) return;
+
+    whEl.value = whEl.value
+      .toUpperCase()
+      .replace(/[^A-Z0-9\-]/g,'')
+      .slice(0,5);
+
     localStorage.setItem('warehouse', whEl.value);
     renderRecent();
   });
 
-  // 鎖定設定
+  // 鎖定設定（預設不鎖定，避免一開始無法輸入庫別）
   const savedLock = localStorage.getItem('lockHeader');
-  const locked = savedLock === null ? true : savedLock === '1';
+  const locked = savedLock === '1';   // 只有 '1' 代表鎖定
   lockHeaderEl.checked = locked;
   applyHeaderLock();
+
+  if (savedLock === null) {
+    // 第一次使用時記錄為未鎖定
+    localStorage.setItem('lockHeader', '0');
+  }
 
   lockHeaderEl.addEventListener('change', () => {
     localStorage.setItem('lockHeader', lockHeaderEl.checked ? '1' : '0');
@@ -531,8 +538,6 @@ btnExport.addEventListener('click', async () => {
 window.addEventListener('online', async () => {
   setNetStatus();
   await updateQueueStatus();
-  // 可視需求決定是否自動同步
-  // syncNow();
 });
 window.addEventListener('offline', () => {
   setNetStatus();
