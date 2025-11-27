@@ -232,7 +232,7 @@ async function doSubmitLocal() {
   await updateQueueStatus();
 }
 
-/* ===== 顯示最近 50 筆（依當前盤點日 + 庫別 + 搜尋條件） ===== */
+/* ===== 顯示最近 5 筆（依當前盤點日 + 庫別 + 搜尋條件） ===== */
 async function renderRecent() {
   const curDate = invDateEl.value;
   const curWh   = whEl.value.trim();
@@ -247,7 +247,7 @@ async function renderRecent() {
   }
 
   list.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-  list = list.slice(0,50);
+  list = list.slice(0,5);
 
   recentEl.innerHTML = '';
 
@@ -549,3 +549,4 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
   });
 }
+
