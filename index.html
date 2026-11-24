@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <title>條碼盤點（專業版 V2）</title>
+  <title>條碼盤點（專業版 V2.1）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -14,7 +14,7 @@
   <div class="app">
     <header class="app-header">
       <div>
-        <h1>條碼盤點（專業版 V2）</h1>
+        <h1>條碼盤點（專業版 V2.1）</h1>
         <p class="sub">離線可用 · iOS / Android PWA · Google 試算表同步</p>
       </div>
       <div class="status-box">
@@ -50,7 +50,7 @@
     <section class="card">
       <h2>掃描與輸入</h2>
       <p class="hint">
-        條碼槍掃描完成若送出 <strong>TAB</strong>，游標會自動跳到數量；
+        條碼槍掃描完成若送出 <strong>TAB</strong>，游標會自動跳到數量並顯示數字面板；
         手動輸入時按 Enter 也能跳轉。數量按 Enter 會直接送出。
       </p>
 
@@ -62,11 +62,27 @@
         </div>
         <div>
           <label>數量（最大 10 碼）</label>
-          <input id="qty" type="number" min="1" inputmode="numeric"
-                 placeholder="請輸入數量">
+          <input id="qty" type="text" inputmode="none" pattern="[0-9]*"
+                 maxlength="10" autocomplete="off" aria-label="盤點數量"
+                 aria-controls="qtyKeypad" placeholder="點此使用數字面板">
+          <button id="btnQtyKeypad" class="ghost full" type="button"
+                  aria-controls="qtyKeypad" aria-expanded="false">開啟數字面板</button>
         </div>
       </div>
 
+      <div id="qtyKeypad" class="qty-keypad" hidden role="group" aria-label="數量數字面板">
+        <div class="keypad-heading"><strong>輸入數量</strong><button type="button" class="ghost" data-pad="close">收合</button></div>
+        <p class="hint small">掃描槍可保持連線，直接點選下方數字。</p>
+        <div class="keypad-grid">
+          <button type="button" data-pad="1">1</button><button type="button" data-pad="2">2</button><button type="button" data-pad="3">3</button>
+          <button type="button" data-pad="4">4</button><button type="button" data-pad="5">5</button><button type="button" data-pad="6">6</button>
+          <button type="button" data-pad="7">7</button><button type="button" data-pad="8">8</button><button type="button" data-pad="9">9</button>
+          <button type="button" data-pad="clear">清除</button><button type="button" data-pad="0">0</button><button type="button" data-pad="backspace" aria-label="刪除一位">⌫</button>
+          <button type="button" data-pad="minus">－1</button><button type="button" data-pad="plus">＋1</button><button type="button" data-pad="submit" class="primary">確認送出</button>
+        </div>
+        <p id="qtyPadMessage" class="hint small" role="status" aria-live="polite"></p>
+      </div>
+      <p id="saveStatus" class="hint small" role="status" aria-live="polite"></p>
       <button id="btnSubmit" class="primary full" style="margin-top:10px">
         送出（寫入本機）
       </button>
@@ -114,7 +130,7 @@
     </section>
 
     <footer class="footer">
-      <span>專業盤點模式 V2 · 支援離線與多裝置 · 由 Apps Script + GitHub Pages 驅動</span>
+      <span>專業盤點模式 V2.1 · 支援離線與多裝置 · 由 Apps Script + GitHub Pages 驅動</span>
     </footer>
   </div>
 

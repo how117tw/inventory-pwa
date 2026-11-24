@@ -1,4 +1,4 @@
-const CACHE_NAME = 'inventory-pwa-v3';
+const CACHE_NAME = 'inventory-pwa-v2.1-keypad-20261124';
 
 const ASSETS = [
   './',
@@ -21,7 +21,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.map(k => k !== CACHE_NAME && caches.delete(k)))
+      Promise.all(keys.map(k => k.startsWith('inventory-pwa-') && k !== CACHE_NAME && caches.delete(k)))
     )
   );
 });

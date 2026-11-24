@@ -178,12 +178,68 @@ function applyHeaderLock() {
 }
 
 /* ===== 輸入欄位互動 ===== */
+const qtyKeypad = document.getElementById('qtyKeypad');
+const btnQtyKeypad = document.getElementById('btnQtyKeypad');
+const qtyPadMessage = document.getElementById('qtyPadMessage');
+const saveStatus = document.getElementById('saveStatus');
+
+function setKeypadOpen(open) {
+  qtyKeypad.hidden = !open;
+  btnQtyKeypad.setAttribute('aria-expanded', String(open));
+  btnQtyKeypad.textContent = open ? '收合數字面板' : '開啟數字面板';
+}
+function goToQuantity() {
+  qtyEl.focus();
+  qtyEl.select();
+  setKeypadOpen(true);
+}
 barcodeEl.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
     e.preventDefault();
-    qtyEl.focus();
-    qtyEl.select();
+    goToQuantity();
   }
+});
+qtyEl.addEventListener('focus', () => setKeypadOpen(true));
+qtyEl.addEventListener('click', () => setKeypadOpen(true));
+barcodeEl.addEventListener('focus', () => setKeypadOpen(false));
+btnQtyKeypad.addEventListener('click', () => {
+  if (!qtyKeypad.hidden) setKeypadOpen(false);
+  else goToQuantity();
+});
+// 點數字時維持欄位游標，讓掃描槍與觸控輸入可以共用。
+qtyKeypad.addEventListener('pointerdown', e => {
+  if (e.target.closest('button')) e.preventDefault();
+});
+qtyKeypad.addEventListener('click', e => {
+  const button = e.target.closest('button[data-pad]');
+  if (!button) return;
+  const action = button.dataset.pad;
+  qtyPadMessage.textContent = '';
+  if (action === 'close') { setKeypadOpen(false); btnQtyKeypad.focus(); return; }
+  if (action === 'submit') { doSubmitLocal(); return; }
+  if (submitInProgress) return;
+  let value = qtyEl.value;
+  let start = qtyEl.selectionStart ?? value.length;
+  let end = qtyEl.selectionEnd ?? start;
+  if (/^[0-9]$/.test(action)) {
+    const next = value.slice(0, start) + action + value.slice(end);
+    if (next.length > 10) { qtyPadMessage.textContent = '數量最多 10 碼。'; return; }
+    value = next;
+    start += 1;
+  } else if (action === 'clear') { value = ''; start = 0; }
+  else if (action === 'backspace') {
+    const left = start === end ? Math.max(0, start - 1) : start;
+    value = value.slice(0, left) + value.slice(end);
+    start = left;
+  } else if (action === 'plus' || action === 'minus') {
+    const next = Math.max(1, Number(value || 0) + (action === 'plus' ? 1 : -1));
+    if (next > 9999999999) { qtyPadMessage.textContent = '數量最多 10 碼。'; return; }
+    value = String(next); start = value.length;
+  }
+  qtyEl.value = value;
+  qtyEl.dispatchEvent(new Event('input', { bubbles: true }));
+  qtyEl.focus();
+  qtyEl.setSelectionRange(start, start);
 });
 
 qtyEl.addEventListener('keydown', e => {
@@ -201,7 +257,9 @@ qtyEl.addEventListener('input', () => {
 btnSubmit.addEventListener('click', doSubmitLocal);
 
 /* ===== 新增本機紀錄 ===== */
+let submitInProgress = false;
 async function doSubmitLocal() {
+  if (submitInProgress) return;
   const date    = invDateEl.value;
   const wh      = whEl.value.trim();
   const barcode = barcodeEl.value.trim();
@@ -221,7 +279,21 @@ async function doSubmitLocal() {
     syncedAt: null
   };
 
-  await addPending(entry);
+  submitInProgress = true;
+  btnSubmit.disabled = true;
+  try {
+    await addPending(entry);
+  } catch (err) {
+    saveStatus.textContent = '儲存失敗，資料已保留在欄位中，請重試。';
+    vibrateError();
+    return;
+  } finally {
+    submitInProgress = false;
+    btnSubmit.disabled = false;
+  }
+  saveStatus.textContent = `已存入本機：${barcode}，數量 ${qty}。`;
+  qtyPadMessage.textContent = '';
+  setKeypadOpen(false);
   vibrateOk();
 
   barcodeEl.value = '';

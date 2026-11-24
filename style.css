@@ -301,3 +301,17 @@ button:disabled {
   color: #9ca3af;
   text-align: center;
 }
+
+/* V2.1：藍牙掃描槍搭配網頁數字面板 */
+.qty-keypad[hidden] { display: none; }
+.qty-keypad { margin-top: 14px; padding: 14px; background: #f0f5fa; border: 1px solid #c8d5e3; border-radius: 12px; }
+.keypad-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.keypad-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.keypad-grid button { min-height: 56px; padding: 10px 4px; font-size: 23px; font-weight: 600; background: #fff; color: #172b42; border: 1px solid #becbd8; border-radius: 10px; touch-action: manipulation; }
+.keypad-grid button[data-pad="submit"] { font-size: 17px; background: #1559a0; color: #fff; }
+.keypad-grid button:active { background: #dceafb; }
+.keypad-grid button:focus-visible { outline: 3px solid #1559a0; outline-offset: 2px; }
+#qty { font-size: 24px; }
+#btnQtyKeypad { margin-top: 8px; }
+#saveStatus:empty, #qtyPadMessage:empty { display: none; }
+#saveStatus { color: #176137; overflow-wrap: anywhere; }
